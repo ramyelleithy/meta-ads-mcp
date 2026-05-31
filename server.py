@@ -55,6 +55,17 @@ TOOLS = [
     {"name": "get_pixel_stats", "description": "إحصائيات pixel", "inputSchema": {"type": "object", "properties": {"pixel_id": {"type": "string"}, "date_preset": {"type": "string"}}, "required": ["pixel_id"]}},
     {"name": "get_pixel_events", "description": "أحداث الـ pixel", "inputSchema": {"type": "object", "properties": {"pixel_id": {"type": "string"}, "date_preset": {"type": "string"}}, "required": ["pixel_id"]}},
     {"name": "get_signal_source_insights", "description": "EMQ وجودة الإشارة", "inputSchema": {"type": "object", "properties": {"pixel_id": {"type": "string"}}, "required": ["pixel_id"]}},
+    
+    {"name": "get_account_billing", "description": "الرصيد والـ billing", "inputSchema": {"type": "object", "properties": {"account_id": {"type": "string"}}, "required": ["account_id"]}},
+    {"name": "get_active_campaigns", "description": "الحملات النشطة فقط", "inputSchema": {"type": "object", "properties": {"account_id": {"type": "string"}}, "required": ["account_id"]}},
+    {"name": "search_campaign", "description": "بحث عن كامبين بالاسم", "inputSchema": {"type": "object", "properties": {"account_id": {"type": "string"}, "keyword": {"type": "string"}}, "required": ["account_id","keyword"]}},
+    {"name": "bulk_update_status", "description": "تشغيل أو إيقاف مجموعة", "inputSchema": {"type": "object", "properties": {"ids": {"type": "array"}, "status": {"type": "string"}}, "required": ["ids","status"]}},
+    {"name": "compare_periods", "description": "مقارنة فترتين", "inputSchema": {"type": "object", "properties": {"entity_id": {"type": "string"}, "level": {"type": "string"}},"required":["entity_id","level"]}},
+    {"name": "get_winners_losers", "description": "أفضل وأسوأ الأداء", "inputSchema": {"type": "object", "properties": {"account_id": {"type": "string"}},"required":["account_id"]}},
+    {"name": "detect_anomalies", "description": "كشف anomalies", "inputSchema": {"type": "object", "properties": {"account_id": {"type": "string"}},"required":["account_id"]}},
+    {"name": "check_pixel_health", "description": "صحة الـ pixel", "inputSchema": {"type": "object", "properties": {"pixel_id": {"type": "string"}},"required":["pixel_id"]}},
+    {"name": "get_aem_status", "description": "حالة AEM", "inputSchema": {"type": "object", "properties": {"pixel_id": {"type": "string"}},"required":["pixel_id"]}},
+
     {"name": "get_domains_and_aem", "description": "Domains وAEM", "inputSchema": {"type": "object", "properties": {"account_id": {"type": "string"}, "business_id": {"type": "string"}}, "required": ["account_id"]}},
 ]
 
@@ -123,6 +134,54 @@ def handle_tool(name, arguments):
                 pixel_aem.append({"pixel_id": pid, "pixel_name": px.get("name"), "aem_config": aem_config})
         domain_data = graph_get(f"/{business_id}/owned_domains", {"fields": "id,domain,verification_status"}) if business_id else {"note": "Provide business_id"}
         return {"pixels_and_aem": pixel_aem, "domain_verification": domain_data}
+
+    elif name == "get_account_billing":
+        return graph_get(f"/{arguments['account_id']}", {
+            "fields": "id,name,account_status,amount_spent,balance,spend_cap,currency,funding_source_details"
+        })
+    elif name == "get_active_campaigns":
+        return graph_get(f"/{arguments['account_id']}/campaigns", {
+            "fields": "id,name,status,objective,daily_budget,updated_time",
+            "effective_status": "['ACTIVE']"
+        })
+    elif name == "search_campaign":
+        data = graph_get(f"/{arguments['account_id']}/campaigns", {"fields":"id,name,status"})
+        kw = arguments["keyword"].lower()
+        if "data" in data:
+            data["data"] = [c for c in data["data"] if kw in c.get("name","").lower()]
+        return data
+    elif name == "bulk_update_status":
+        results = []
+        for obj_id in arguments["ids"]:
+            results.append(graph_post(f"/{obj_id}", {"status": arguments["status"]}))
+        return {"results": results}
+    elif name == "compare_periods":
+        return {
+            "note": "Basic compare placeholder",
+            "current": graph_get(f"/{arguments['entity_id']}/insights", {"date_preset":"last_3d"}),
+            "previous": graph_get(f"/{arguments['entity_id']}/insights", {"date_preset":"last_7d"})
+        }
+    elif name == "get_winners_losers":
+        return graph_get(f"/{arguments['account_id']}/campaigns", {
+            "fields":"id,name,status,insights{spend,ctr,cpc}"
+        })
+    elif name == "detect_anomalies":
+        return {
+            "note":"Initial anomaly detector placeholder",
+            "insights": graph_get(f"/{arguments['account_id']}/insights", {
+                "fields":"spend,ctr,cpc,reach,impressions",
+                "date_preset":"last_7d"
+            })
+        }
+    elif name == "check_pixel_health":
+        return graph_get(f"/{arguments['pixel_id']}", {
+            "fields":"id,name,last_fired_time,is_unavailable,match_rate_approx"
+        })
+    elif name == "get_aem_status":
+        return graph_get(f"/{arguments['pixel_id']}/aem_conversion_filter", {
+            "fields":"pixel_id,domains,event_configurations"
+        })
+
     return {"error": f"Tool not found: {name}"}
 
 
