@@ -39,11 +39,11 @@ TOOLS = [
     {"name": "get_adset_insights", "description": "إحصائيات ad set", "inputSchema": {"type": "object", "properties": {"adset_id": {"type": "string"}, "date_preset": {"type": "string"}}, "required": ["adset_id"]}},
     {"name": "get_ads", "description": "الإعلانات جوه ad set", "inputSchema": {"type": "object", "properties": {"adset_id": {"type": "string"}}, "required": ["adset_id"]}},
     {"name": "get_ad_insights", "description": "إحصائيات إعلان", "inputSchema": {"type": "object", "properties": {"ad_id": {"type": "string"}, "date_preset": {"type": "string"}}, "required": ["ad_id"]}},
-    {"name": "update_campaign_status", "description": "تشغيل/إيقاف كامبين", "inputSchema": {"type": "object", "properties": {"campaign_id": {"type": "string"}, "status": {"type": "string", "enum": ["ACTIVE", "PAUSED"]}}, "required": ["campaign_id", "status"]}},
-    {"name": "update_adset_status", "description": "تشغيل/إيقاف ad set", "inputSchema": {"type": "object", "properties": {"adset_id": {"type": "string"}, "status": {"type": "string", "enum": ["ACTIVE", "PAUSED"]}}, "required": ["adset_id", "status"]}},
-    {"name": "update_ad_status", "description": "تشغيل/إيقاف إعلان", "inputSchema": {"type": "object", "properties": {"ad_id": {"type": "string"}, "status": {"type": "string", "enum": ["ACTIVE", "PAUSED"]}}, "required": ["ad_id", "status"]}},
-    {"name": "update_adset_budget", "description": "تعديل بودجت ad set (بالقروش، 10000 = 100 جنيه)", "inputSchema": {"type": "object", "properties": {"adset_id": {"type": "string"}, "daily_budget": {"type": "string"}}, "required": ["adset_id", "daily_budget"]}},
-    {"name": "update_campaign_budget", "description": "تعديل بودجت كامبين CBO", "inputSchema": {"type": "object", "properties": {"campaign_id": {"type": "string"}, "daily_budget": {"type": "string"}}, "required": ["campaign_id", "daily_budget"]}},
+    {"name": "update_campaign_status", "description": "تشغيل/إيقاف كامبين", "inputSchema": {"type": "object", "properties": {"campaign_id": {"type": "string"}, "status": {"type": "string"}}, "required": ["campaign_id", "status"]}},
+    {"name": "update_adset_status", "description": "تشغيل/إيقاف ad set", "inputSchema": {"type": "object", "properties": {"adset_id": {"type": "string"}, "status": {"type": "string"}}, "required": ["adset_id", "status"]}},
+    {"name": "update_ad_status", "description": "تشغيل/إيقاف إعلان", "inputSchema": {"type": "object", "properties": {"ad_id": {"type": "string"}, "status": {"type": "string"}}, "required": ["ad_id", "status"]}},
+    {"name": "update_adset_budget", "description": "تعديل بودجت ad set", "inputSchema": {"type": "object", "properties": {"adset_id": {"type": "string"}, "daily_budget": {"type": "string"}}, "required": ["adset_id", "daily_budget"]}},
+    {"name": "update_campaign_budget", "description": "تعديل بودجت كامبين", "inputSchema": {"type": "object", "properties": {"campaign_id": {"type": "string"}, "daily_budget": {"type": "string"}}, "required": ["campaign_id", "daily_budget"]}},
     {"name": "copy_campaign", "description": "نسخ كامبين", "inputSchema": {"type": "object", "properties": {"campaign_id": {"type": "string"}, "account_id": {"type": "string"}}, "required": ["campaign_id", "account_id"]}},
     {"name": "copy_adset", "description": "نسخ ad set", "inputSchema": {"type": "object", "properties": {"adset_id": {"type": "string"}, "campaign_id": {"type": "string"}}, "required": ["adset_id", "campaign_id"]}},
     {"name": "get_pixels", "description": "Pixels الحساب", "inputSchema": {"type": "object", "properties": {"account_id": {"type": "string"}}, "required": ["account_id"]}},
@@ -124,6 +124,44 @@ def handle_tool(name, arguments):
 @app.route("/", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "server": "meta-ads-mcp"})
+
+
+@app.route("/.well-known/oauth-authorization-server", methods=["GET"])
+def oauth_metadata():
+    base = "https://web-production-2a8d3.up.railway.app"
+    return jsonify({
+        "issuer": base,
+        "authorization_endpoint": f"{base}/auth",
+        "token_endpoint": f"{base}/token",
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code"]
+    })
+
+
+@app.route("/auth", methods=["GET"])
+def auth():
+    redirect_uri = request.args.get("redirect_uri", "")
+    state = request.args.get("state", "")
+    return f"""
+    <html><body>
+    <h2>Meta Ads MCP - Authorization</h2>
+    <p>اضغط للموافقة على الاتصال</p>
+    <a href="{redirect_uri}?code=static-code&state={state}">
+        <button style="padding:10px 20px;font-size:16px;background:#1877f2;color:white;border:none;border-radius:5px;cursor:pointer">
+            Authorize
+        </button>
+    </a>
+    </body></html>
+    """
+
+
+@app.route("/token", methods=["POST"])
+def token():
+    return jsonify({
+        "access_token": "static-token",
+        "token_type": "bearer",
+        "expires_in": 999999
+    })
 
 
 @app.route("/mcp", methods=["POST"])
